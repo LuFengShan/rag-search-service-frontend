@@ -1,0 +1,21 @@
+# 企业私有知识库问答系统 - Docker Compose
+
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-frontend
+    ports:
+      - "5173:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+networks:
+  rag-network:
+    driver: bridge
