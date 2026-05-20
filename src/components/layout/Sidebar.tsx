@@ -27,7 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [internalCollapsed, setInternalCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const location = useLocation()
-  const { user, logout } = useUserStore()
+  const { role, isAuthenticated, logout } = useUserStore()
 
   const isCollapsed = externalCollapsed ?? internalCollapsed
 
@@ -40,17 +40,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   const menuItems = [
-    { path: '/', icon: Home, label: '智能问答', roles: ['admin', 'maintainer', 'user'] },
-    { path: '/documents', icon: FileText, label: '文档管理', roles: ['admin', 'maintainer'] },
-    { path: '/knowledge', icon: Database, label: '知识库', roles: ['admin', 'maintainer'] },
-    { path: '/analytics', icon: BarChart3, label: '运营分析', roles: ['admin'] },
-    { path: '/admin/users', icon: Users, label: '用户管理', roles: ['admin'] },
-    { path: '/admin/roles', icon: Shield, label: '权限配置', roles: ['admin'] },
-    { path: '/admin/settings', icon: Settings, label: '系统设置', roles: ['admin'] }
+    { path: '/', icon: Home, label: '智能问答', roles: ['ADMIN', 'KNOWLEDGE_BASE_ADMIN', 'USER'] },
+    { path: '/documents', icon: FileText, label: '文档管理', roles: ['ADMIN', 'KNOWLEDGE_BASE_ADMIN'] },
+    { path: '/knowledge', icon: Database, label: '知识库', roles: ['ADMIN', 'KNOWLEDGE_BASE_ADMIN'] },
+    { path: '/analytics', icon: BarChart3, label: '运营分析', roles: ['ADMIN'] },
+    { path: '/admin/users', icon: Users, label: '用户管理', roles: ['ADMIN'] },
+    { path: '/admin/roles', icon: Shield, label: '权限配置', roles: ['ADMIN'] },
+    { path: '/admin/settings', icon: Settings, label: '系统设置', roles: ['ADMIN'] }
   ]
 
   const filteredMenuItems = menuItems.filter(
-    (item) => user && item.roles.includes(user.role)
+    (item) => role && item.roles.includes(role)
   )
 
   const NavContent = () => (
@@ -95,19 +95,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={logout}
-          className={`
-            flex items-center gap-3 px-3 py-2.5 rounded-lg
-            text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 w-full
-            ${isCollapsed ? 'justify-center' : ''}
-          `}
-        >
-          <LogOut className="w-5 h-5" />
-          {!isCollapsed && <span>退出登录</span>}
-        </button>
-      </div>
+      {isAuthenticated && (
+        <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={logout}
+            className={`
+              flex items-center gap-3 px-3 py-2.5 rounded-lg
+              text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 w-full
+              ${isCollapsed ? 'justify-center' : ''}
+            `}
+          >
+            <LogOut className="w-5 h-5" />
+            {!isCollapsed && <span>退出登录</span>}
+          </button>
+        </div>
+      )}
     </>
   )
 

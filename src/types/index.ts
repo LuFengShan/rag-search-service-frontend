@@ -1,65 +1,101 @@
+export interface ApiResponse<T> {
+  success: boolean
+  message: string
+  data: T
+}
+
+export interface PagedResponse<T> {
+  list: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface LoginResponse {
+  token: string
+  userId: string
+  username: string
+  email: string
+  role: string
+}
+
 export interface User {
   id: string
   username: string
   email: string
-  role: 'admin' | 'maintainer' | 'user'
-  avatar?: string
-  created_at: string
+  role: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateUserRequest {
+  username: string
+  email: string
+  password: string
+  role: string
+}
+
+export interface UpdateUserRequest {
+  username?: string
+  email?: string
+  role?: string
 }
 
 export interface KnowledgeBase {
   id: string
   name: string
   description: string
-  embedding_model: string
-  document_count: number
-  status: 'active' | 'inactive'
-  created_at: string
-  updated_at: string
+  embeddingModel: string
+  config: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateKnowledgeBaseRequest {
+  name: string
+  description: string
+}
+
+export interface UpdateKnowledgeBaseRequest {
+  name?: string
+  description?: string
 }
 
 export interface Document {
   id: string
   title: string
-  file_type: string
-  file_size: number
-  status: 'uploading' | 'processing' | 'indexed' | 'failed'
-  chunks: number
-  knowledge_base_id: string
-  uploaded_by: string
-  created_at: string
-  updated_at: string
-}
-
-export interface DocumentChunk {
-  id: string
-  document_id: string
-  chunk_index: number
-  content: string
-  created_at: string
-}
-
-export interface Question {
-  id: string
-  question: string
-  user_id: string
-  status: 'pending' | 'answered' | 'failed'
-  created_at: string
+  filePath: string
+  fileType: string
+  fileSize: number
+  metadata: string
+  knowledgeBaseId: string
+  uploadedBy: string
+  status: string
+  createdAt: string
+  updatedAt: string
+  chunkCount: number
 }
 
 export interface Answer {
   id: string
-  question_id: string
+  questionId: string
   answer: string
   sources: Source[]
   confidence: number
-  created_at: string
+  createdAt: string
 }
 
 export interface Source {
-  document_id: string
-  document_title: string
-  chunk_content: string
+  documentId: string
+  documentTitle: string
+  chunkContent: string
   confidence: number
 }
 
@@ -72,12 +108,11 @@ export interface Conversation {
 }
 
 export interface AnalyticsOverview {
-  total_questions: number
-  avg_response_time: number
-  satisfaction_rate: number
-  today_questions: number
-  hot_documents: Array<{id: string, title: string, count: number}>
-  hot_questions: Array<{question: string, count: number}>
+  totalQuestions: number
+  avgResponseTime: number
+  satisfactionRate: number
+  hotDocuments: Array<{ id: string; title: string; count: number }>
+  hotQuestions: Array<{ question: string; count: number }>
 }
 
 export interface TrendData {
@@ -86,4 +121,10 @@ export interface TrendData {
   answers: number
 }
 
-export type UserRole = 'admin' | 'maintainer' | 'user'
+export interface TrendResponse {
+  data: TrendData[]
+}
+
+export interface QuestionRequest {
+  question: string
+}

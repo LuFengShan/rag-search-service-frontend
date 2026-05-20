@@ -1,13 +1,12 @@
-import React from 'react'
-import { BarChart3, TrendingUp, MessageSquare, Clock, Star, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { TrendingUp, MessageSquare, Clock, Star, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import * as analyticsApi from '../../services/analyticsApi'
+import { AnalyticsOverview, TrendData } from '../../types'
 import { Card } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
-import { mockAnalyticsOverview, mockTrendData } from '../../services/mock/analytics'
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,13 +16,62 @@ import {
 } from 'recharts'
 
 export const AnalyticsPage: React.FC = () => {
-  const data = mockAnalyticsOverview
-  const trendData = mockTrendData
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
+  const [trendData, setTrendData] = useState<TrendData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [overviewRes, trendRes] = await Promise.all([
+          analyticsApi.getOverview(),
+          analyticsApi.getTrend(
+            new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            new Date().toISOString().split('T')[0],
+            'daily'
+          )
+        ])
+        setOverview(overviewRes.data)
+        setTrendData(trendRes.data.data || [])
+      } catch {
+        // ignore
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  const data = overview
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">运营分析</h1>
+          <p className="text-sm text-gray-600">监控知识库使用情况，持续优化用户体验</p>
+        </div>
+        <div className="flex items-center justify-center py-20 text-gray-500">加载中...</div>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">运营分析</h1>
+          <p className="text-sm text-gray-600">监控知识库使用情况，持续优化用户体验</p>
+        </div>
+        <div className="flex items-center justify-center py-20 text-gray-500">暂无数据</div>
+      </div>
+    )
+  }
 
   const statsCards = [
     {
       title: '总提问数',
-      value: data.total_questions.toLocaleString(),
+      value: data.totalQuestions.toLocaleString(),
       icon: MessageSquare,
       color: 'bg-gradient-to-br from-primary-500 to-primary-600',
       trend: '+12.5%',
@@ -31,7 +79,7 @@ export const AnalyticsPage: React.FC = () => {
     },
     {
       title: '今日提问',
-      value: data.today_questions,
+      value: '-',
       icon: TrendingUp,
       color: 'bg-gradient-to-br from-success-500 to-success-600',
       trend: '+5.2%',
@@ -39,7 +87,7 @@ export const AnalyticsPage: React.FC = () => {
     },
     {
       title: '平均响应时间',
-      value: `${data.avg_response_time}s`,
+      value: `${data.avgResponseTime.toFixed(1)}s`,
       icon: Clock,
       color: 'bg-gradient-to-br from-warning-500 to-warning-600',
       trend: '-8.3%',
@@ -47,7 +95,7 @@ export const AnalyticsPage: React.FC = () => {
     },
     {
       title: '满意度评分',
-      value: data.satisfaction_rate.toFixed(1),
+      value: data.satisfactionRate.toFixed(1),
       icon: Star,
       color: 'bg-gradient-to-br from-danger-500 to-danger-600',
       trend: '+0.2',
@@ -132,31 +180,35 @@ export const AnalyticsPage: React.FC = () => {
             </div>
           </div>
           <div className="space-y-3">
-            {data.hot_documents.map((doc, index) => (
-              <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className={`
-                  w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm
-                  ${index === 0 ? 'bg-warning-500 text-white' :
-                    index === 1 ? 'bg-gray-400 text-white' :
-                    index === 2 ? 'bg-warning-700 text-white' :
-                    'bg-gray-100 text-gray-600'}
-                `}>
-                  {index + 1}
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900 text-sm">{doc.title}</div>
-                  <div className="text-xs text-gray-500">{doc.count} 次检索</div>
-                </div>
-                <div className="w-20">
-                  <div className="bg-gray-200 rounded-full h-1.5">
-                    <div
-                      className="bg-primary-500 rounded-full h-1.5 transition-all"
-                      style={{ width: `${(doc.count / data.hot_documents[0].count) * 100}%` }}
-                    />
+            {data.hotDocuments && data.hotDocuments.length > 0 ? (
+              data.hotDocuments.map((doc, index) => (
+                <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className={`
+                    w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm
+                    ${index === 0 ? 'bg-warning-500 text-white' :
+                      index === 1 ? 'bg-gray-400 text-white' :
+                      index === 2 ? 'bg-warning-700 text-white' :
+                      'bg-gray-100 text-gray-600'}
+                  `}>
+                    {index + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 text-sm">{doc.title}</div>
+                    <div className="text-xs text-gray-500">{doc.count} 次检索</div>
+                  </div>
+                  <div className="w-20">
+                    <div className="bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className="bg-primary-500 rounded-full h-1.5 transition-all"
+                        style={{ width: `${(doc.count / data.hotDocuments[0].count) * 100}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <div className="text-sm text-gray-500 py-8 text-center">暂无数据</div>
+            )}
           </div>
         </Card>
       </div>
@@ -169,28 +221,32 @@ export const AnalyticsPage: React.FC = () => {
           </div>
         </div>
         <div className="space-y-2">
-          {data.hot_questions.map((item, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-            >
-              <div className={`
-                w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                ${index === 0 ? 'bg-primary-100 text-primary-600' :
-                  index === 1 ? 'bg-success-100 text-success-600' :
-                  index === 2 ? 'bg-warning-100 text-warning-600' :
-                  'bg-gray-100 text-gray-600'}
-              `}>
-                {index + 1}
+          {data.hotQuestions && data.hotQuestions.length > 0 ? (
+            data.hotQuestions.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                <div className={`
+                  w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                  ${index === 0 ? 'bg-primary-100 text-primary-600' :
+                    index === 1 ? 'bg-success-100 text-success-600' :
+                    index === 2 ? 'bg-warning-100 text-warning-600' :
+                    'bg-gray-100 text-gray-600'}
+                `}>
+                  {index + 1}
+                </div>
+                <div className="flex-1 font-medium text-gray-900 text-sm">
+                  {item.question}
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {item.count} 次提问
+                </Badge>
               </div>
-              <div className="flex-1 font-medium text-gray-900 text-sm">
-                {item.question}
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                {item.count} 次提问
-              </Badge>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-sm text-gray-500 py-8 text-center">暂无数据</div>
+          )}
         </div>
       </Card>
     </div>

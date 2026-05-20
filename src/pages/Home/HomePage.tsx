@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { decodeHtml } from '../../lib/utils'
 
 export const HomePage: React.FC = () => {
   const {
@@ -146,61 +147,63 @@ export const HomePage: React.FC = () => {
                             <span className="font-medium">智能助手</span>
                           </div>
                           <span className="text-xs text-gray-400">
-                            {new Date(conv.answer.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(conv.answer.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                         <Card className="border border-gray-200 rounded-2xl rounded-tl-md shadow-sm overflow-hidden">
                           <div className="px-5 py-4">
                             <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                              {conv.answer.answer}
+                              {decodeHtml(conv.answer.answer)}
                             </div>
                           </div>
 
-                          <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="success" className="text-xs">
-                                  置信度 {Math.round(conv.answer.confidence * 100)}%
-                                </Badge>
-                                <Badge variant="primary" className="text-xs">
-                                  {conv.answer.sources.length} 个参考文档
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="收藏">
-                                  <Bookmark className="w-4 h-4" />
-                                </button>
-                                <button className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="分享">
-                                  <Share2 className="w-4 h-4" />
-                                </button>
-                                <button className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="重新生成">
-                                  <RefreshCw className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <p className="text-xs font-medium text-gray-500">参考文档：</p>
-                              {conv.answer.sources.map((source, idx) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 bg-white border border-gray-200 rounded-xl"
-                                >
-                                  <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-sm font-medium text-primary-600">
-                                      {source.document_title}
-                                    </span>
-                                    <Badge variant={source.confidence > 0.9 ? 'success' : 'warning'} className="text-xs">
-                                      {Math.round(source.confidence * 100)}%
-                                    </Badge>
-                                  </div>
-                                  <p className="text-xs text-gray-600 italic leading-relaxed">
-                                    "{source.chunk_content}"
-                                  </p>
+                          {conv.answer.sources && conv.answer.sources.length > 0 && (
+                            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="success" className="text-xs">
+                                    置信度 {Math.round(conv.answer.confidence * 100)}%
+                                  </Badge>
+                                  <Badge variant="primary" className="text-xs">
+                                    {conv.answer.sources.length} 个参考文档
+                                  </Badge>
                                 </div>
-                              ))}
+                                <div className="flex items-center gap-1">
+                                  <button className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="收藏">
+                                    <Bookmark className="w-4 h-4" />
+                                  </button>
+                                  <button className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="分享">
+                                    <Share2 className="w-4 h-4" />
+                                  </button>
+                                  <button className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="重新生成">
+                                    <RefreshCw className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <p className="text-xs font-medium text-gray-500">参考文档：</p>
+                                {conv.answer.sources.map((source, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3 bg-white border border-gray-200 rounded-xl"
+                                  >
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className="text-sm font-medium text-primary-600">
+                                        {source.documentTitle}
+                                      </span>
+                                      <Badge variant={source.confidence > 0.9 ? 'success' : 'warning'} className="text-xs">
+                                        {Math.round(source.confidence * 100)}%
+                                      </Badge>
+                                    </div>
+                                    <p className="text-xs text-gray-600 italic leading-relaxed">
+                                      "{decodeHtml(source.chunkContent)}"
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </Card>
                       </div>
                     </div>

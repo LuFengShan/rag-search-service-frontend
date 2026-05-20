@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { Conversation, Answer } from '../types'
-import { mockQAHistory, generateMockAnswer } from '../services/mock/qa'
+import * as qaApi from '../services/qaApi'
 
 interface QAStore {
   currentQuestion: string
@@ -13,42 +13,75 @@ interface QAStore {
 
 export const useQAStore = create<QAStore>((set, get) => ({
   currentQuestion: '',
-  conversations: mockQAHistory,
+  conversations: [],
   isLoading: false,
+
   setQuestion: (question: string) => {
     set({ currentQuestion: question })
   },
+
   submitQuestion: async () => {
     const { currentQuestion, conversations } = get()
     if (!currentQuestion.trim()) return
 
+    const convId = Date.now().toString()
     const newConversation: Conversation = {
-      id: Date.now().toString(),
+      id: convId,
       question: currentQuestion,
       answer: null,
       isLoading: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     }
 
     set({
       conversations: [...conversations, newConversation],
       currentQuestion: '',
-      isLoading: true
+      isLoading: true,
     })
 
-    setTimeout(() => {
-      const answer = generateMockAnswer(currentQuestion)
+    try {
+      const res = await qaApi.askQuestion({ question: currentQuestion })
+      const backendAnswer = res.data
+
+      const answer: Answer = {
+        id: convId,
+        questionId: convId,
+        answer: backendAnswer.answer,
+        sources: backendAnswer.sources || [],
+        confidence: backendAnswer.confidence,
+        createdAt: new Date().toISOString(),
+      }
+
       set((state) => ({
         conversations: state.conversations.map((conv) =>
-          conv.id === newConversation.id
-            ? { ...conv, answer, isLoading: false }
+          conv.id === convId ? { ...conv, answer, isLoading: false } : conv
+        ),
+        isLoading: false,
+      }))
+    } catch {
+      set((state) => ({
+        conversations: state.conversations.map((conv) =>
+          conv.id === convId
+            ? {
+                ...conv,
+                answer: {
+                  id: convId,
+                  questionId: convId,
+                  answer: '抱歉，请求失败，请稍后重试。',
+                  sources: [],
+                  confidence: 0,
+                  createdAt: new Date().toISOString(),
+                },
+                isLoading: false,
+              }
             : conv
         ),
-        isLoading: false
+        isLoading: false,
       }))
-    }, 1500)
+    }
   },
+
   clearHistory: () => {
     set({ conversations: [] })
-  }
+  },
 }))
