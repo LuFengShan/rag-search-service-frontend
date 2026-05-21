@@ -127,4 +127,14 @@ export interface TrendResponse {
 
 export interface QuestionRequest {
   question: string
+  knowledgeBaseId?: string
+}
+
+export interface QuestionRecord {
+  id: string
+  userId: string
+  question: string
+  knowledgeBaseId: string | null
+  status: 'PENDING' | 'ANSWERED' | 'FAILED'
+  createdAt: string
 }

@@ -1,23 +1,42 @@
-import React, { useEffect, useRef } from 'react'
-import { Send, Sparkles, History, Trash2, Bookmark, Share2, RefreshCw, User, Bot } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Send, Sparkles, History, Trash2, Bookmark, Share2, RefreshCw, User, Bot, Database, Clock, ChevronLeft, ChevronRight, Loader2, MessageSquare, X } from 'lucide-react'
 import { useQAStore } from '../../stores/qaStore'
+import { useKnowledgeStore } from '../../stores/knowledgeStore'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { Modal } from '../../components/ui/Modal'
 import { decodeHtml } from '../../lib/utils'
+import * as qaApi from '../../services/qaApi'
+import { QuestionRecord } from '../../types'
 
 export const HomePage: React.FC = () => {
   const {
     currentQuestion,
     conversations,
     isLoading,
+    selectedKnowledgeBaseId,
     setQuestion,
+    setKnowledgeBaseId,
     submitQuestion,
     clearHistory
   } = useQAStore()
 
+  const { knowledgeBases, fetchKnowledgeBases } = useKnowledgeStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [historyRecords, setHistoryRecords] = useState<QuestionRecord[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyPage, setHistoryPage] = useState(0)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyTotalPages, setHistoryTotalPages] = useState(0)
+  const pageSize = 10
+
+  useEffect(() => {
+    fetchKnowledgeBases()
+  }, [fetchKnowledgeBases])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -36,6 +55,33 @@ export const HomePage: React.FC = () => {
     }
   }
 
+  const loadHistory = async (page = 0) => {
+    setHistoryLoading(true)
+    setHistoryPage(page)
+    try {
+      const res = await qaApi.getHistory(page, pageSize)
+      setHistoryRecords(res.data.list)
+      setHistoryTotal(res.data.total)
+      setHistoryTotalPages(res.data.totalPages)
+    } catch {
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const openHistory = () => {
+    setIsHistoryOpen(true)
+    loadHistory(0)
+  }
+
+  const useHistoryItem = (q: QuestionRecord) => {
+    setQuestion(q.question)
+    if (q.knowledgeBaseId) {
+      setKnowledgeBaseId(q.knowledgeBaseId)
+    }
+    setIsHistoryOpen(false)
+  }
+
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col">
       <div className="px-6 py-6 flex-shrink-0">
@@ -44,9 +90,22 @@ export const HomePage: React.FC = () => {
             <div className="w-14 h-14 bg-gradient-to-br from-primary-500 via-primary-600 to-primary-700 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/25">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 tracking-tight">智能问答助手</h1>
               <p className="text-gray-500 mt-0.5">基于 RAG 技术的企业私有知识库问答系统</p>
+            </div>
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+              <Database className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <select
+                value={selectedKnowledgeBaseId}
+                onChange={(e) => setKnowledgeBaseId(e.target.value)}
+                className="bg-transparent text-sm text-gray-700 focus:outline-none min-w-[120px] max-w-[180px] truncate"
+              >
+                <option value="">全部知识库</option>
+                {knowledgeBases.map((kb) => (
+                  <option key={kb.id} value={kb.id}>{kb.name}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -243,15 +302,18 @@ export const HomePage: React.FC = () => {
             </Button>
           </form>
 
-          {conversations.length > 0 && (
-            <div className="flex items-center justify-between mt-3 px-2">
-              <div className="flex items-center gap-4">
-                <button className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 transition-colors">
-                  <History className="w-3.5 h-3.5" />
-                  查看历史
-                </button>
-                <span className="text-xs text-gray-400">{conversations.length} 条对话</span>
-              </div>
+          <div className="flex items-center justify-between mt-3 px-2">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={openHistory}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 transition-colors"
+              >
+                <History className="w-3.5 h-3.5" />
+                查看历史
+              </button>
+              <span className="text-xs text-gray-400">{conversations.length} 条对话</span>
+            </div>
+            {conversations.length > 0 && (
               <button
                 onClick={clearHistory}
                 className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-danger-500 transition-colors"
@@ -259,10 +321,86 @@ export const HomePage: React.FC = () => {
                 <Trash2 className="w-3.5 h-3.5" />
                 清空对话
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
+
+      <Modal open={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} title="历史会话" size="lg">
+        <div className="space-y-4">
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-16 text-gray-400">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              加载中...
+            </div>
+          ) : historyRecords.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <MessageSquare className="w-7 h-7 text-gray-400" />
+              </div>
+              <p className="text-gray-500 mb-1 font-medium">暂无历史记录</p>
+              <p className="text-sm text-gray-400">您提问后，历史记录将显示在这里</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {historyRecords.map((record) => (
+                  <button
+                    key={record.id}
+                    onClick={() => useHistoryItem(record)}
+                    className="w-full text-left p-4 bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 rounded-xl transition-all group"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <p className="text-sm text-gray-900 font-medium line-clamp-2 group-hover:text-primary-700">
+                        {record.question}
+                      </p>
+                      <Badge
+                        variant={
+                          record.status === 'ANSWERED' ? 'success' :
+                          record.status === 'FAILED' ? 'danger' : 'warning'
+                        }
+                        className="text-xs flex-shrink-0"
+                      >
+                        {record.status === 'ANSWERED' ? '已回答' :
+                         record.status === 'FAILED' ? '失败' : '处理中'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {record.createdAt ? new Date(record.createdAt).toLocaleString('zh-CN') : '-'}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100 text-sm text-gray-500">
+                <span>共 {historyTotal} 条记录</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => loadHistory(historyPage - 1)}
+                    disabled={historyPage === 0}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    上一页
+                  </button>
+                  <span className="px-2 text-xs">{historyPage + 1} / {Math.max(historyTotalPages, 1)}</span>
+                  <button
+                    onClick={() => loadHistory(historyPage + 1)}
+                    disabled={historyPage + 1 >= historyTotalPages}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+                  >
+                    下一页
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
     </div>
   )
 }

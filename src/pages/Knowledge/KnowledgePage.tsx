@@ -12,7 +12,9 @@ export const KnowledgePage: React.FC = () => {
   const { knowledgeBases, isLoading, fetchKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } = useKnowledgeStore()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isViewOpen, setIsViewOpen] = useState(false)
   const [editingKB, setEditingKB] = useState<KnowledgeBase | null>(null)
+  const [viewingKB, setViewingKB] = useState<KnowledgeBase | null>(null)
   const [newKBName, setNewKBName] = useState('')
   const [newKBDescription, setNewKBDescription] = useState('')
   const [editName, setEditName] = useState('')
@@ -51,6 +53,11 @@ export const KnowledgePage: React.FC = () => {
     setIsEditModalOpen(true)
   }
 
+  const openView = (kb: KnowledgeBase) => {
+    setViewingKB(kb)
+    setIsViewOpen(true)
+  }
+
   const handleEdit = async () => {
     if (!editingKB || !editName.trim()) {
       setFormError('请输入知识库名称')
@@ -77,6 +84,9 @@ export const KnowledgePage: React.FC = () => {
       alert('删除失败，请稍后重试')
     }
   }
+
+  const formatDateTime = (dateStr: string | undefined) =>
+    dateStr ? new Date(dateStr).toLocaleString('zh-CN') : '-'
 
   return (
     <div className="h-full flex flex-col">
@@ -158,12 +168,7 @@ export const KnowledgePage: React.FC = () => {
                   <Edit2 className="w-3.5 h-3.5 mr-1" />
                   编辑
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => {
-                  setEditingKB(kb)
-                  setEditName(kb.name)
-                  setEditDesc(kb.description || '')
-                  alert(`知识库详情：\n名称：${kb.name}\n描述：${kb.description || '无'}\n模型：${kb.embeddingModel || '未配置'}\n创建者：${kb.createdBy}\n创建时间：${kb.createdAt ? new Date(kb.createdAt).toLocaleString('zh-CN') : '-'}`)
-                }}>
+                <Button variant="ghost" size="sm" onClick={() => openView(kb)}>
                   <Eye className="w-3.5 h-3.5" />
                 </Button>
                 <Button
@@ -270,6 +275,60 @@ export const KnowledgePage: React.FC = () => {
             <Button onClick={handleEdit} loading={isSubmitting} disabled={!editName.trim()}>保存修改</Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={isViewOpen} onClose={() => setIsViewOpen(false)} title="知识库详情" size="lg">
+        {viewingKB && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-gray-500">知识库名称</label>
+                <p className="text-sm text-gray-900 font-medium mt-1">{viewingKB.name}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">知识库 ID</label>
+                <p className="text-sm text-gray-900 mt-1 truncate">{viewingKB.id}</p>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-500">描述</label>
+                <p className="text-sm text-gray-900 mt-1">{viewingKB.description || '暂无描述'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">Embedding 模型</label>
+                <p className="text-sm text-gray-900 mt-1">{viewingKB.embeddingModel || '未配置'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">配置</label>
+                <p className="text-sm text-gray-900 mt-1">{viewingKB.config || '默认配置'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">创建者</label>
+                <p className="text-sm text-gray-900 mt-1 truncate">{viewingKB.createdBy || '-'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">创建时间</label>
+                <p className="text-sm text-gray-900 mt-1">{formatDateTime(viewingKB.createdAt)}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">更新时间</label>
+                <p className="text-sm text-gray-900 mt-1">{formatDateTime(viewingKB.updatedAt)}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">状态</label>
+                <div className="mt-1"><Badge variant="success" className="text-xs">启用</Badge></div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <Button variant="secondary" onClick={() => setIsViewOpen(false)}>关闭</Button>
+              <Button onClick={() => {
+                setIsViewOpen(false)
+                if (viewingKB) openEdit(viewingKB)
+              }}>
+                <Edit2 className="w-4 h-4 mr-1.5" />编辑此知识库
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

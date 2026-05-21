@@ -6,7 +6,9 @@ interface QAStore {
   currentQuestion: string
   conversations: Conversation[]
   isLoading: boolean
+  selectedKnowledgeBaseId: string
   setQuestion: (question: string) => void
+  setKnowledgeBaseId: (id: string) => void
   submitQuestion: () => Promise<void>
   clearHistory: () => void
 }
@@ -15,13 +17,18 @@ export const useQAStore = create<QAStore>((set, get) => ({
   currentQuestion: '',
   conversations: [],
   isLoading: false,
+  selectedKnowledgeBaseId: '',
 
   setQuestion: (question: string) => {
     set({ currentQuestion: question })
   },
 
+  setKnowledgeBaseId: (id: string) => {
+    set({ selectedKnowledgeBaseId: id })
+  },
+
   submitQuestion: async () => {
-    const { currentQuestion, conversations } = get()
+    const { currentQuestion, conversations, selectedKnowledgeBaseId } = get()
     if (!currentQuestion.trim()) return
 
     const convId = Date.now().toString()
@@ -40,7 +47,14 @@ export const useQAStore = create<QAStore>((set, get) => ({
     })
 
     try {
-      const res = await qaApi.askQuestion({ question: currentQuestion })
+      const requestBody: { question: string; knowledgeBaseId?: string } = {
+        question: currentQuestion,
+      }
+      if (selectedKnowledgeBaseId) {
+        requestBody.knowledgeBaseId = selectedKnowledgeBaseId
+      }
+
+      const res = await qaApi.askQuestion(requestBody)
       const backendAnswer = res.data
 
       const answer: Answer = {
