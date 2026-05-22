@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Conversation, Answer } from '../types'
+import { Conversation, Answer, ConversationSession, ConversationMessage } from '../types'
 import * as qaApi from '../services/qaApi'
 
 interface QAStore {
@@ -7,10 +7,18 @@ interface QAStore {
   conversations: Conversation[]
   isLoading: boolean
   selectedKnowledgeBaseId: string
+  currentSessionId: string
+  sessions: ConversationSession[]
+  sessionsLoading: boolean
   setQuestion: (question: string) => void
   setKnowledgeBaseId: (id: string) => void
+  setCurrentSessionId: (id: string) => void
   submitQuestion: () => Promise<void>
   clearHistory: () => void
+  newSession: () => void
+  loadSessions: () => Promise<void>
+  loadSessionMessages: (sessionId: string) => Promise<void>
+  deleteSession: (sessionId: string) => void
 }
 
 export const useQAStore = create<QAStore>((set, get) => ({
@@ -18,6 +26,9 @@ export const useQAStore = create<QAStore>((set, get) => ({
   conversations: [],
   isLoading: false,
   selectedKnowledgeBaseId: '',
+  currentSessionId: '',
+  sessions: [],
+  sessionsLoading: false,
 
   setQuestion: (question: string) => {
     set({ currentQuestion: question })
@@ -27,8 +38,62 @@ export const useQAStore = create<QAStore>((set, get) => ({
     set({ selectedKnowledgeBaseId: id })
   },
 
+  setCurrentSessionId: (id: string) => {
+    set({ currentSessionId: id })
+  },
+
+  newSession: () => {
+    set({ conversations: [], currentSessionId: '' })
+  },
+
+  loadSessions: async () => {
+    set({ sessionsLoading: true })
+    try {
+      const res = await qaApi.getSessions()
+      set({ sessions: res.data, sessionsLoading: false })
+    } catch {
+      set({ sessionsLoading: false })
+    }
+  },
+
+  loadSessionMessages: async (sessionId: string) => {
+    set({ isLoading: true })
+    try {
+      const res = await qaApi.getSessionMessages(sessionId)
+      const conversations: Conversation[] = res.data.map((msg: ConversationMessage) => ({
+        id: msg.questionId,
+        question: msg.question,
+        answer: msg.answer
+          ? {
+              id: msg.questionId,
+              questionId: msg.questionId,
+              answer: msg.answer,
+              sources: [],
+              confidence: 0,
+              createdAt: msg.createdAt,
+            }
+          : null,
+        isLoading: false,
+        timestamp: msg.createdAt,
+      }))
+      set({ conversations, currentSessionId: sessionId })
+    } catch {
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  deleteSession: (sessionId: string) => {
+    set((state) => ({
+      sessions: state.sessions.filter((s) => s.sessionId !== sessionId),
+    }))
+    if (get().currentSessionId === sessionId) {
+      set({ conversations: [], currentSessionId: '' })
+    }
+  },
+
   submitQuestion: async () => {
-    const { currentQuestion, conversations, selectedKnowledgeBaseId } = get()
+    const { currentQuestion, conversations, selectedKnowledgeBaseId, currentSessionId } = get()
     if (!currentQuestion.trim()) return
 
     const convId = Date.now().toString()
@@ -47,11 +112,14 @@ export const useQAStore = create<QAStore>((set, get) => ({
     })
 
     try {
-      const requestBody: { question: string; knowledgeBaseId?: string } = {
+      const requestBody: { question: string; knowledgeBaseId?: string; sessionId?: string } = {
         question: currentQuestion,
       }
       if (selectedKnowledgeBaseId) {
         requestBody.knowledgeBaseId = selectedKnowledgeBaseId
+      }
+      if (currentSessionId) {
+        requestBody.sessionId = currentSessionId
       }
 
       const res = await qaApi.askQuestion(requestBody)
@@ -72,6 +140,8 @@ export const useQAStore = create<QAStore>((set, get) => ({
         ),
         isLoading: false,
       }))
+
+      get().loadSessions()
     } catch {
       set((state) => ({
         conversations: state.conversations.map((conv) =>

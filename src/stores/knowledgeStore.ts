@@ -7,7 +7,7 @@ interface KnowledgeStore {
   currentKnowledgeBase: KnowledgeBase | null
   isLoading: boolean
   fetchKnowledgeBases: () => Promise<void>
-  createKnowledgeBase: (data: { name: string; description: string }) => Promise<void>
+  createKnowledgeBase: (data: { name: string; description: string; docType?: string }) => Promise<void>
   updateKnowledgeBase: (id: string, data: { name?: string; description?: string }) => Promise<void>
   deleteKnowledgeBase: (id: string) => Promise<void>
   setCurrentKnowledgeBase: (kb: KnowledgeBase | null) => void

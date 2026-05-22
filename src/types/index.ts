@@ -19,10 +19,15 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string
+  refreshToken: string
   userId: string
   username: string
   email: string
   role: string
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string
 }
 
 export interface User {
@@ -61,6 +66,7 @@ export interface KnowledgeBase {
 export interface CreateKnowledgeBaseRequest {
   name: string
   description: string
+  docType?: string
 }
 
 export interface UpdateKnowledgeBaseRequest {
@@ -109,6 +115,7 @@ export interface Conversation {
 
 export interface AnalyticsOverview {
   totalQuestions: number
+  todayQuestions: number
   avgResponseTime: number
   satisfactionRate: number
   hotDocuments: Array<{ id: string; title: string; count: number }>
@@ -128,6 +135,7 @@ export interface TrendResponse {
 export interface QuestionRequest {
   question: string
   knowledgeBaseId?: string
+  sessionId?: string
 }
 
 export interface QuestionRecord {
@@ -135,6 +143,22 @@ export interface QuestionRecord {
   userId: string
   question: string
   knowledgeBaseId: string | null
+  sessionId: string | null
   status: 'PENDING' | 'ANSWERED' | 'FAILED'
+  createdAt: string
+}
+
+export interface ConversationSession {
+  sessionId: string
+  title: string
+  messageCount: number
+  lastMessageAt: string
+}
+
+export interface ConversationMessage {
+  questionId: string
+  question: string
+  answer: string | null
+  status: string
   createdAt: string
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Database, Plus, Settings, Trash2, Clock, MoreVertical, Edit2, Eye, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Database, Plus, Settings, Trash2, Clock, MoreVertical, Edit2, Eye, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { useKnowledgeStore } from '../../stores/knowledgeStore'
 import { KnowledgeBase } from '../../types'
 import { Card } from '../../components/ui/Card'
@@ -17,6 +17,7 @@ export const KnowledgePage: React.FC = () => {
   const [viewingKB, setViewingKB] = useState<KnowledgeBase | null>(null)
   const [newKBName, setNewKBName] = useState('')
   const [newKBDescription, setNewKBDescription] = useState('')
+  const [newKBDocType, setNewKBDocType] = useState('')
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [formError, setFormError] = useState('')
@@ -34,9 +35,14 @@ export const KnowledgePage: React.FC = () => {
     setIsSubmitting(true)
     setFormError('')
     try {
-      await createKnowledgeBase({ name: newKBName, description: newKBDescription })
+      await createKnowledgeBase({
+        name: newKBName,
+        description: newKBDescription,
+        docType: newKBDocType || undefined,
+      })
       setNewKBName('')
       setNewKBDescription('')
+      setNewKBDocType('')
       setIsCreateModalOpen(false)
     } catch {
       setFormError('创建失败，请稍后重试')
@@ -99,6 +105,7 @@ export const KnowledgePage: React.FC = () => {
           onClick={() => {
             setNewKBName('')
             setNewKBDescription('')
+            setNewKBDocType('')
             setFormError('')
             setIsCreateModalOpen(true)
           }}
@@ -215,6 +222,32 @@ export const KnowledgePage: React.FC = () => {
               className="block w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">文档类型</label>
+            <select
+              value={newKBDocType}
+              onChange={(e) => setNewKBDocType(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">通用类型（支持 PDF/Word/PPT/TXT 等）</option>
+              <option value="CAR_MD">卖车知识库（仅限 Markdown .md 文件）</option>
+            </select>
+          </div>
+
+          {newKBDocType === 'CAR_MD' && (
+            <div className="flex items-start gap-2 p-3 bg-warning-50 border border-warning-200 rounded-lg text-sm text-warning-700">
+              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium mb-0.5">卖车知识库说明</p>
+                <ul className="space-y-0.5 text-warning-600 text-xs">
+                  <li>• 仅接受 .md 格式文件，请使用固定的车系MD模板</li>
+                  <li>• 每个文件代表一个车系，包含YAML frontmatter元数据</li>
+                  <li>• Agent 将自动切换为汽车销售顾问角色</li>
+                </ul>
+              </div>
+            </div>
+          )}
 
           <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
             <div className="flex items-start gap-2">

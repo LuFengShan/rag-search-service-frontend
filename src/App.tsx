@@ -12,7 +12,10 @@ import { LoginPage } from './pages/Login/LoginPage'
 import { useUserStore } from './stores/userStore'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useUserStore()
+  const { isAuthenticated, isInitialized } = useUserStore()
+  if (!isInitialized) {
+    return null
+  }
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }

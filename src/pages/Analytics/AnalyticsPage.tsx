@@ -74,31 +74,31 @@ export const AnalyticsPage: React.FC = () => {
       value: data.totalQuestions.toLocaleString(),
       icon: MessageSquare,
       color: 'bg-gradient-to-br from-primary-500 to-primary-600',
-      trend: '+12.5%',
+      trend: null,
       trendUp: true
     },
     {
       title: '今日提问',
-      value: '-',
+      value: (data.todayQuestions || 0).toLocaleString(),
       icon: TrendingUp,
       color: 'bg-gradient-to-br from-success-500 to-success-600',
-      trend: '+5.2%',
+      trend: null,
       trendUp: true
     },
     {
-      title: '平均响应时间',
+      title: '平均处理时间',
       value: `${data.avgResponseTime.toFixed(1)}s`,
       icon: Clock,
       color: 'bg-gradient-to-br from-warning-500 to-warning-600',
-      trend: '-8.3%',
+      trend: null,
       trendUp: false
     },
     {
-      title: '满意度评分',
-      value: data.satisfactionRate.toFixed(1),
+      title: '回答成功率',
+      value: `${Math.round(data.satisfactionRate * 100)}%`,
       icon: Star,
       color: 'bg-gradient-to-br from-danger-500 to-danger-600',
-      trend: '+0.2',
+      trend: null,
       trendUp: true
     }
   ]
@@ -119,12 +119,14 @@ export const AnalyticsPage: React.FC = () => {
                 <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
                   <Icon className="w-6 h-6 text-white" />
                 </div>
+                {stat.trend && (
                 <Badge variant={stat.trendUp ? 'success' : 'danger'} className="flex items-center gap-1">
                   {stat.trendUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                   {stat.trend}
                 </Badge>
+                )}
               </div>
-              <div className="text-2.5xl font-bold text-gray-900 mb-1">{stat.value}</div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">{stat.value}</div>
               <div className="text-sm text-gray-500">{stat.title}</div>
             </Card>
           )
@@ -175,39 +177,37 @@ export const AnalyticsPage: React.FC = () => {
         <Card className="h-full">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="font-semibold text-gray-900">热门文档 TOP 5</h2>
-              <p className="text-sm text-gray-500">被检索次数最多的文档</p>
+              <h2 className="font-semibold text-gray-900">最近处理文档 TOP 5</h2>
+              <p className="text-sm text-gray-500">按分块数量排序</p>
             </div>
           </div>
           <div className="space-y-3">
-            {data.hotDocuments && data.hotDocuments.length > 0 ? (
-              data.hotDocuments.map((doc, index) => (
+            {data.hotDocuments && data.hotDocuments.length > 0 && data.hotDocuments[0].count > 0 ? (
+              data.hotDocuments.map((doc, index) => {
+                const maxCount = data.hotDocuments[0].count || 1
+                const pct = Math.min(Math.round((doc.count / maxCount) * 100), 100)
+                return (
                 <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                  <div className={`
-                    w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm
-                    ${index === 0 ? 'bg-warning-500 text-white' :
-                      index === 1 ? 'bg-gray-400 text-white' :
-                      index === 2 ? 'bg-warning-700 text-white' :
-                      'bg-gray-100 text-gray-600'}
-                  `}>
+                  <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                     {index + 1}
                   </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900 text-sm">{doc.title}</div>
-                    <div className="text-xs text-gray-500">{doc.count} 次检索</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 text-sm truncate">{doc.title}</div>
+                    <div className="text-xs text-gray-400">{doc.count} 个分块</div>
                   </div>
-                  <div className="w-20">
+                  <div className="w-16 flex-shrink-0">
                     <div className="bg-gray-200 rounded-full h-1.5">
                       <div
                         className="bg-primary-500 rounded-full h-1.5 transition-all"
-                        style={{ width: `${(doc.count / data.hotDocuments[0].count) * 100}%` }}
+                        style={{ width: `${Math.max(pct, 8)}%` }}
                       />
                     </div>
                   </div>
                 </div>
-              ))
+                )
+              })
             ) : (
-              <div className="text-sm text-gray-500 py-8 text-center">暂无数据</div>
+              <div className="text-sm text-gray-400 py-12 text-center">上传文档并完成处理后将在此展示</div>
             )}
           </div>
         </Card>

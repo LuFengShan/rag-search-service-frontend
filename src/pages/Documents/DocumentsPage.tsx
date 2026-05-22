@@ -365,7 +365,7 @@ interface UploadModalProps {
   onClose: () => void
   uploadDocument: (file: File) => Promise<void>
   uploadProgress: number
-  knowledgeBases: { id: string; name: string }[]
+  knowledgeBases: { id: string; name: string; config?: string }[]
   selectedKBId: string
   onKBChange: (id: string) => void
 }
@@ -374,21 +374,28 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
 
+  const selectedKB = knowledgeBases.find((kb) => kb.id === selectedKBId)
+  const isCarKD = selectedKB?.config?.includes('"docType":"CAR_MD"')
+
+  const acceptConfig = isCarKD
+    ? { 'text/markdown': ['.md'], 'text/plain': ['.md', '.markdown'] }
+    : {
+        'application/pdf': ['.pdf'],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+        'application/msword': ['.doc'],
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+        'application/vnd.ms-powerpoint': ['.ppt'],
+        'text/plain': ['.txt'],
+      }
+
   const onDrop = React.useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) setSelectedFile(acceptedFiles[0])
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-      'application/vnd.ms-powerpoint': ['.ppt'],
-      'text/plain': ['.txt']
-    },
-    maxFiles: 1
+    accept: acceptConfig,
+    maxFiles: 1,
   })
 
   const handleUpload = async () => {
@@ -419,6 +426,23 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument
           </select>
         </div>
 
+        {isCarKD && (
+          <div className="flex items-center justify-between p-3 bg-warning-50 border border-warning-200 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-warning-700">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              此知识库仅支持 <strong>Markdown 格式</strong> 文档上传
+            </div>
+            <a
+              href="/车系MD模板示例.md"
+              download="车系MD模板示例.md"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-warning-300 rounded-lg text-xs font-medium text-warning-700 hover:bg-warning-100 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              下载模板
+            </a>
+          </div>
+        )}
+
         {!selectedFile ? (
           <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all ${isDragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'}`}>
             <input {...getInputProps()} />
@@ -426,7 +450,9 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument
               <Upload className={`w-8 h-8 ${isDragActive ? 'text-primary-600' : 'text-gray-400'}`} />
             </div>
             <p className="text-lg font-medium text-gray-900 mb-2">{isDragActive ? '拖拽文件到此处' : '拖拽文件到此处，或点击选择'}</p>
-            <p className="text-sm text-gray-500 mb-4">支持 PDF、Word、PowerPoint、TXT 等格式</p>
+            <p className="text-sm text-gray-500 mb-4">
+              {isCarKD ? '仅支持 Markdown 格式（.md 文件）' : '支持 PDF、Word、PowerPoint、TXT 等格式'}
+            </p>
             <Button variant="secondary" size="sm">选择文件</Button>
           </div>
         ) : (
