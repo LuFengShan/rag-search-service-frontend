@@ -84,6 +84,7 @@ export const useQAStore = create<QAStore>((set, get) => ({
   },
 
   deleteSession: (sessionId: string) => {
+    qaApi.deleteSession(sessionId).catch(() => {})
     set((state) => ({
       sessions: state.sessions.filter((s) => s.sessionId !== sessionId),
     }))

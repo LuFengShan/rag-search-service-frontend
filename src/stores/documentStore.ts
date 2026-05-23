@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Document } from '../types'
+import { Document, BulkUploadResponse } from '../types'
 import * as documentApi from '../services/documentApi'
 
 interface DocumentStore {
@@ -7,10 +7,14 @@ interface DocumentStore {
   currentDocument: Document | null
   uploadProgress: number
   isLoading: boolean
+  bulkUploadResult: BulkUploadResponse | null
   fetchDocuments: (knowledgeBaseId?: string, search?: string) => Promise<void>
   uploadDocument: (file: File, knowledgeBaseId: string) => Promise<void>
+  uploadDocuments: (files: File[], knowledgeBaseId: string) => Promise<BulkUploadResponse>
+  uploadFolder: (zipFile: File, knowledgeBaseId: string) => Promise<BulkUploadResponse>
   deleteDocument: (id: string) => Promise<void>
   setCurrentDocument: (doc: Document | null) => void
+  clearBulkUploadResult: () => void
 }
 
 export const useDocumentStore = create<DocumentStore>((set, get) => ({
@@ -18,6 +22,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   currentDocument: null,
   uploadProgress: 0,
   isLoading: false,
+  bulkUploadResult: null,
 
   fetchDocuments: async (knowledgeBaseId, search) => {
     set({ isLoading: true })
@@ -42,6 +47,38 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
     }
   },
 
+  uploadDocuments: async (files, knowledgeBaseId) => {
+    set({ uploadProgress: 0 })
+    try {
+      const res = await documentApi.uploadDocuments(files, knowledgeBaseId)
+      if (res.data) {
+        set((state) => ({
+          documents: [...res.data.successList, ...state.documents],
+          bulkUploadResult: res.data,
+        }))
+      }
+      return res.data
+    } catch {
+      throw new Error('批量上传失败')
+    }
+  },
+
+  uploadFolder: async (zipFile, knowledgeBaseId) => {
+    set({ uploadProgress: 0 })
+    try {
+      const res = await documentApi.uploadFolder(zipFile, knowledgeBaseId)
+      if (res.data) {
+        set((state) => ({
+          documents: [...res.data.successList, ...state.documents],
+          bulkUploadResult: res.data,
+        }))
+      }
+      return res.data
+    } catch {
+      throw new Error('文件夹上传失败')
+    }
+  },
+
   deleteDocument: async (id) => {
     await documentApi.deleteDocument(id)
     set((state) => ({
@@ -51,5 +88,9 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
 
   setCurrentDocument: (doc) => {
     set({ currentDocument: doc })
+  },
+
+  clearBulkUploadResult: () => {
+    set({ bulkUploadResult: null })
   },
 }))

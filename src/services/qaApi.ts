@@ -12,3 +12,6 @@ export const getSessions = () =>
 
 export const getSessionMessages = (sessionId: string) =>
   api.get<ApiResponse<ConversationMessage[]>>(`/qa/sessions/${sessionId}/messages`).then((res) => res.data)
+
+export const deleteSession = (sessionId: string) =>
+  api.delete<ApiResponse<null>>(`/qa/sessions/${sessionId}`).then((res) => res.data)

@@ -162,3 +162,16 @@ export interface ConversationMessage {
   status: string
   createdAt: string
 }
+
+export interface UploadError {
+  fileName: string
+  reason: string
+}
+
+export interface BulkUploadResponse {
+  totalFiles: number
+  successCount: number
+  failCount: number
+  successList: Document[]
+  errors: UploadError[]
+}

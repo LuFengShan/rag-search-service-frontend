@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Upload, Search, FileText, Trash2, Eye, Plus, CheckSquare, Square, Grid, List, X, AlertCircle } from 'lucide-react'
+import { Upload, Search, FileText, Trash2, Eye, Download, Plus, CheckSquare, Square, Grid, List, X, AlertCircle, FolderArchive, Files } from 'lucide-react'
 import { useDocumentStore } from '../../stores/documentStore'
 import { useKnowledgeStore } from '../../stores/knowledgeStore'
-import { Document } from '../../types'
+import { Document, BulkUploadResponse } from '../../types'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
@@ -10,9 +10,10 @@ import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useDropzone } from 'react-dropzone'
+import { downloadDocument } from '../../services/documentApi'
 
 export const DocumentsPage: React.FC = () => {
-  const { documents, isLoading, uploadProgress, fetchDocuments, uploadDocument, deleteDocument } = useDocumentStore()
+  const { documents, isLoading, uploadProgress, fetchDocuments, uploadDocument, uploadDocuments, uploadFolder, deleteDocument } = useDocumentStore()
   const { knowledgeBases, fetchKnowledgeBases } = useKnowledgeStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -97,6 +98,15 @@ export const DocumentsPage: React.FC = () => {
       await deleteDocument(id)
     } catch {
       alert('删除失败')
+    }
+  }
+
+  const handleDownload = async (doc: Document) => {
+    try {
+      const filename = doc.title ? `${doc.title}.${doc.fileType}` : `document.${doc.fileType}`
+      await downloadDocument(doc.id, filename)
+    } catch {
+      alert('下载失败')
     }
   }
 
@@ -250,10 +260,13 @@ export const DocumentsPage: React.FC = () => {
                   <div className="w-24 text-sm text-gray-500">
                     {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('zh-CN') : '-'}
                   </div>
-                  <div className="w-20">
+                  <div className="w-24">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openPreview(doc)} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="预览">
                         <Eye className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDownload(doc)} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="下载">
+                        <Download className="w-4 h-4" />
                       </button>
                       <button onClick={() => handleDelete(doc.id)} className="p-2 text-gray-400 hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors" title="删除">
                         <Trash2 className="w-4 h-4" />
@@ -287,6 +300,17 @@ export const DocumentsPage: React.FC = () => {
                       <span>{doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('zh-CN') : '-'}</span>
                     </div>
                   </div>
+                  <div className="flex items-center gap-1 pt-2 border-t border-gray-100 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); openPreview(doc) }} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="预览">
+                      <Eye className="w-3.5 h-3.5" />预览
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDownload(doc) }} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="下载">
+                      <Download className="w-3.5 h-3.5" />下载
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(doc.id) }} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-gray-500 hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors" title="删除">
+                      <Trash2 className="w-3.5 h-3.5" />删除
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -303,6 +327,8 @@ export const DocumentsPage: React.FC = () => {
         open={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         uploadDocument={(file) => uploadDocument(file, selectedKBId)}
+        uploadDocuments={(files) => uploadDocuments(files, selectedKBId)}
+        uploadFolder={(zipFile) => uploadFolder(zipFile, selectedKBId)}
         uploadProgress={uploadProgress}
         knowledgeBases={knowledgeBases}
         selectedKBId={selectedKBId}
@@ -364,15 +390,22 @@ interface UploadModalProps {
   open: boolean
   onClose: () => void
   uploadDocument: (file: File) => Promise<void>
+  uploadDocuments: (files: File[]) => Promise<BulkUploadResponse>
+  uploadFolder: (zipFile: File) => Promise<BulkUploadResponse>
   uploadProgress: number
   knowledgeBases: { id: string; name: string; config?: string }[]
   selectedKBId: string
   onKBChange: (id: string) => void
 }
 
-const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument, uploadProgress, knowledgeBases, selectedKBId, onKBChange }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+type UploadMode = 'single' | 'batch' | 'folder'
+
+const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument, uploadDocuments, uploadFolder, uploadProgress, knowledgeBases, selectedKBId, onKBChange }) => {
+  const [uploadMode, setUploadMode] = useState<UploadMode>('single')
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [selectedZipFile, setSelectedZipFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [result, setResult] = useState<BulkUploadResponse | null>(null)
 
   const selectedKB = knowledgeBases.find((kb) => kb.id === selectedKBId)
   const isCarKD = selectedKB?.config?.includes('"docType":"CAR_MD"')
@@ -388,34 +421,103 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument
         'text/plain': ['.txt'],
       }
 
+  const zipAccept = { 'application/zip': ['.zip'] }
+
   const onDrop = React.useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) setSelectedFile(acceptedFiles[0])
-  }, [])
+    if (uploadMode === 'batch') {
+      setSelectedFiles((prev) => [...prev, ...acceptedFiles])
+    } else if (uploadMode === 'folder') {
+      if (acceptedFiles.length > 0) setSelectedZipFile(acceptedFiles[0])
+    } else {
+      if (acceptedFiles.length > 0) setSelectedFiles([acceptedFiles[0]])
+    }
+  }, [uploadMode])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: acceptConfig,
-    maxFiles: 1,
+    accept: uploadMode === 'folder' ? zipAccept : acceptConfig,
+    maxFiles: uploadMode === 'single' ? 1 : uploadMode === 'folder' ? 1 : 0,
+    multiple: uploadMode === 'batch',
   })
 
   const handleUpload = async () => {
-    if (selectedFile) {
-      setIsUploading(true)
-      try {
-        await uploadDocument(selectedFile)
-        setSelectedFile(null)
+    setIsUploading(true)
+    setResult(null)
+    try {
+      if (uploadMode === 'folder' && selectedZipFile) {
+        const res = await uploadFolder(selectedZipFile)
+        setResult(res)
+        if (res.failCount === 0) {
+          resetForm()
+          onClose()
+        }
+      } else if (uploadMode === 'batch' && selectedFiles.length > 0) {
+        const res = await uploadDocuments(selectedFiles)
+        setResult(res)
+        if (res.failCount === 0) {
+          resetForm()
+          onClose()
+        }
+      } else if (uploadMode === 'single' && selectedFiles.length > 0) {
+        await uploadDocument(selectedFiles[0])
+        resetForm()
         onClose()
-      } catch {
-        alert('上传失败')
-      } finally {
-        setIsUploading(false)
       }
+    } catch {
+      alert('上传失败')
+    } finally {
+      setIsUploading(false)
     }
   }
 
+  const resetForm = () => {
+    setSelectedFiles([])
+    setSelectedZipFile(null)
+    setResult(null)
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0) + (selectedZipFile?.size || 0)
+
+  const handleClose = () => {
+    resetForm()
+    onClose()
+  }
+
+  const isUploadDisabled = () => {
+    if (uploadMode === 'folder') return !selectedZipFile || !selectedKBId
+    return selectedFiles.length === 0 || !selectedKBId
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="上传文档" size="lg">
+    <Modal open={open} onClose={handleClose} title="上传文档" size="lg">
       <div className="space-y-4">
+        {/* 上传模式切换 */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+          {([
+            { mode: 'single' as const, label: '单文件上传', icon: <Upload className="w-4 h-4" /> },
+            { mode: 'batch' as const, label: '批量上传', icon: <Files className="w-4 h-4" /> },
+            { mode: 'folder' as const, label: '文件夹上传', icon: <FolderArchive className="w-4 h-4" /> },
+          ]).map(({ mode, label, icon }) => (
+            <button
+              key={mode}
+              onClick={() => { setUploadMode(mode); setSelectedFiles([]); setSelectedZipFile(null); setResult(null) }}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                uploadMode === mode
+                  ? 'bg-white text-primary-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* 知识库选择 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">目标知识库</label>
           <select value={selectedKBId} onChange={(e) => onKBChange(e.target.value)}
@@ -426,6 +528,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument
           </select>
         </div>
 
+        {/* CAR_MD 提示 */}
         {isCarKD && (
           <div className="flex items-center justify-between p-3 bg-warning-50 border border-warning-200 rounded-lg">
             <div className="flex items-center gap-2 text-sm text-warning-700">
@@ -443,31 +546,89 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument
           </div>
         )}
 
-        {!selectedFile ? (
+        {/* 拖拽上传区域 */}
+        {selectedFiles.length === 0 && !selectedZipFile ? (
           <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all ${isDragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'}`}>
             <input {...getInputProps()} />
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Upload className={`w-8 h-8 ${isDragActive ? 'text-primary-600' : 'text-gray-400'}`} />
+              {uploadMode === 'folder' ? (
+                <FolderArchive className={`w-8 h-8 ${isDragActive ? 'text-primary-600' : 'text-gray-400'}`} />
+              ) : uploadMode === 'batch' ? (
+                <Files className={`w-8 h-8 ${isDragActive ? 'text-primary-600' : 'text-gray-400'}`} />
+              ) : (
+                <Upload className={`w-8 h-8 ${isDragActive ? 'text-primary-600' : 'text-gray-400'}`} />
+              )}
             </div>
-            <p className="text-lg font-medium text-gray-900 mb-2">{isDragActive ? '拖拽文件到此处' : '拖拽文件到此处，或点击选择'}</p>
-            <p className="text-sm text-gray-500 mb-4">
-              {isCarKD ? '仅支持 Markdown 格式（.md 文件）' : '支持 PDF、Word、PowerPoint、TXT 等格式'}
+            <p className="text-lg font-medium text-gray-900 mb-2">
+              {uploadMode === 'folder'
+                ? (isDragActive ? '拖拽 ZIP 文件到此处' : '拖拽 ZIP 压缩包到此处，或点击选择')
+                : uploadMode === 'batch'
+                ? (isDragActive ? '拖拽文件到此处' : '拖拽文件到此处，或点击选择多个文件')
+                : (isDragActive ? '拖拽文件到此处' : '拖拽文件到此处，或点击选择')}
             </p>
-            <Button variant="secondary" size="sm">选择文件</Button>
+            <p className="text-sm text-gray-500 mb-4">
+              {uploadMode === 'folder'
+                ? '上传 ZIP 压缩包，自动解压并导入其中所有文档（支持嵌套目录）'
+                : uploadMode === 'batch'
+                ? '可同时选择多个文件批量上传，单个失败不影响其他文件'
+                : isCarKD ? '仅支持 Markdown 格式（.md 文件）' : '支持 PDF、Word、PowerPoint、TXT 等格式'}
+            </p>
+            <Button variant="secondary" size="sm">
+              {uploadMode === 'folder' ? '选择 ZIP 文件' : uploadMode === 'batch' ? '选择多个文件' : '选择文件'}
+            </Button>
           </div>
         ) : (
-          <div className="p-4 bg-gray-50 rounded-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                <FileText className="w-6 h-6 text-primary-600" />
+          /* 已选文件列表 */
+          <div className="space-y-3">
+            {uploadMode === 'folder' && selectedZipFile && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                    <FolderArchive className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{selectedZipFile.name}</p>
+                    <p className="text-sm text-gray-500">{(selectedZipFile.size / 1024 / 1024).toFixed(2)} MB · ZIP 压缩包</p>
+                  </div>
+                  <button onClick={() => setSelectedZipFile(null)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-              </div>
-              <button onClick={() => setSelectedFile(null)} className="text-gray-400 hover:text-gray-600">×</button>
-            </div>
+            )}
 
+            {uploadMode !== 'folder' && selectedFiles.length > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm text-gray-500">
+                  <span>已选择 {selectedFiles.length} 个文件</span>
+                  <span>共 {(totalSize / 1024 / 1024).toFixed(2)} MB</span>
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                        <FileText className="w-5 h-5 text-primary-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm truncate">{file.name}</p>
+                        <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <button onClick={() => removeFile(idx)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {uploadMode === 'batch' && (
+                  <div {...getRootProps()} className="border-2 border-dashed border-gray-200 rounded-lg p-3 text-center cursor-pointer hover:border-primary-400 hover:bg-gray-50 transition-all">
+                    <input {...getInputProps()} />
+                    <p className="text-sm text-gray-500">拖拽或点击添加更多文件</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* 上传进度 */}
             {isUploading && uploadProgress > 0 && (
               <div>
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
@@ -482,10 +643,45 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onClose, uploadDocument
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button onClick={handleUpload} loading={isUploading} disabled={!selectedFile || !selectedKBId}>
-            {isUploading ? '上传中...' : '开始上传'}
+        {/* 上传结果摘要 */}
+        {result && result.failCount > 0 && (
+          <div className="p-4 bg-warning-50 border border-warning-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="w-4 h-4 text-warning-600" />
+              <p className="font-medium text-sm text-warning-800">
+                上传完成：成功 {result.successCount} 个，失败 {result.failCount} 个
+              </p>
+            </div>
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {result.errors.map((err, idx) => (
+                <p key={idx} className="text-xs text-warning-700 pl-6">
+                  ❌ <strong>{err.fileName}</strong>：{err.reason}
+                </p>
+              ))}
+            </div>
+            {result.successList.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {result.successList.map((doc) => (
+                  <p key={doc.id} className="text-xs text-green-700 pl-6">
+                    ✅ {doc.title}.{doc.fileType}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 操作按钮 */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          <Button variant="secondary" onClick={handleClose}>取消</Button>
+          <Button onClick={handleUpload} loading={isUploading} disabled={isUploadDisabled()}>
+            {isUploading
+              ? '上传中...'
+              : uploadMode === 'folder'
+              ? '上传 ZIP 并导入'
+              : uploadMode === 'batch'
+              ? `上传 ${selectedFiles.length} 个文件`
+              : '开始上传'}
           </Button>
         </div>
       </div>

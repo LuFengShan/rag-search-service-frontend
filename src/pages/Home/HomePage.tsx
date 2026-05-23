@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Send, Sparkles, Trash2, Bookmark, RefreshCw, User, Bot, Database, Plus, MessageSquare, Clock, ChevronRight, Loader2 } from 'lucide-react'
+import { Send, Sparkles, Trash2, RefreshCw, Copy, Check, User, Bot, Database, Plus, MessageSquare, Clock, ChevronRight, Loader2 } from 'lucide-react'
 import { useQAStore } from '../../stores/qaStore'
 import { useKnowledgeStore } from '../../stores/knowledgeStore'
 import { Card } from '../../components/ui/Card'
@@ -29,6 +29,7 @@ export const HomePage: React.FC = () => {
   const { knowledgeBases, fetchKnowledgeBases } = useKnowledgeStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchKnowledgeBases()
@@ -38,6 +39,18 @@ export const HomePage: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [conversations])
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const handleReAsk = (question: string) => {
+    setQuestion(question)
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement | null
+    if (textarea) textarea.focus()
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -219,8 +232,24 @@ export const HomePage: React.FC = () => {
                             <span>我</span>
                           </div>
                         </div>
-                        <div className="bg-primary-500 text-white px-4 py-3 rounded-2xl rounded-tr-md shadow-sm">
+                        <div className="bg-primary-500 text-white px-4 py-3 rounded-2xl rounded-tr-md shadow-sm group/question relative">
                           <p className="text-sm leading-relaxed">{conv.question}</p>
+                          <div className="absolute -bottom-7 right-0 flex items-center gap-1 opacity-0 group-hover/question:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleCopy(conv.question, `q-${conv.id}`)}
+                              className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-md transition-colors"
+                            >
+                              {copiedId === `q-${conv.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                              {copiedId === `q-${conv.id}` ? '已复制' : '复制'}
+                            </button>
+                            <button
+                              onClick={() => handleReAsk(conv.question)}
+                              className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-md transition-colors"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              重新提问
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -252,30 +281,36 @@ export const HomePage: React.FC = () => {
                         <div className="flex-1">
                           <Card className="border border-gray-200 rounded-2xl rounded-tl-md shadow-sm overflow-hidden">
                             <div className="px-4 py-3">
-                              <div className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">
+                              <div className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap group/answer relative">
                                 {decodeHtml(conv.answer.answer)}
+                                <div className="absolute -bottom-7 right-0 flex items-center gap-1 opacity-0 group-hover/answer:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => handleCopy(decodeHtml(conv.answer!.answer), `a-${conv.id}`)}
+                                    className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-md transition-colors"
+                                  >
+                                    {copiedId === `a-${conv.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                    {copiedId === `a-${conv.id}` ? '已复制' : '复制'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleReAsk(conv.question)}
+                                    className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-md transition-colors"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                    重新提问
+                                  </button>
+                                </div>
                               </div>
                             </div>
 
                             {conv.answer.sources && conv.answer.sources.length > 0 && (
                               <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 mb-2">
                                     <Badge variant="success" className="text-[10px]">
                                       置信度 {Math.round(conv.answer.confidence * 100)}%
                                     </Badge>
                                     <Badge variant="primary" className="text-[10px]">
                                       {conv.answer.sources.length} 个参考文档
                                     </Badge>
-                                  </div>
-                                  <div className="flex items-center gap-0.5">
-                                    <button className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg" title="收藏">
-                                      <Bookmark className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg" title="重新生成">
-                                      <RefreshCw className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
                                 </div>
                                 <div className="space-y-1.5">
                                   <p className="text-[10px] font-medium text-gray-500">参考文档：</p>
